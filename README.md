@@ -1,68 +1,102 @@
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+# React Context Replacement For MobX
 
-## Available Scripts
+## Providers
 
-In the project directory, you can run:
+import { UsersProvider, AssessmentsProvider } from './context/providers'
 
-### `npm start`
+```
+<div className='App'>
+  <UsersProvider>
+    <AssessmentsProvider>
+      <Page />
+    </AssessmentsProvider>
+  </UsersProvider>
+</div>
+```
 
-Runs the app in the development mode.<br>
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+Any component nested under a provider can hook up to it.
 
-The page will reload if you make edits.<br>
-You will also see any lint errors in the console.
+## Consumers
 
-### `npm test`
+You can inject the contexts by using the following syntax. If this syntax is unfamiliar, inject is an HOC. It allows us to basically wrap our Page component and inject props provided from the users and assessments context.
 
-Launches the test runner in the interactive watch mode.<br>
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```
+export default compose(
+  inject('users'),
+  inject('assessments')
+)(Page)
+```
 
-### `npm run build`
+compose is a helper library that allows us to write this in a way that is easier to read. A typical HOC looks like this:
 
-Builds the app for production to the `build` folder.<br>
-It correctly bundles React in production mode and optimizes the build for the best performance.
+`withHoc(Page)`
 
-The build is minified and the filenames include the hashes.<br>
-Your app is ready to be deployed!
+When you have multiple Hocs, things get a little ugly. Especially if we had a lot of hocs:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+`withHoc1(withHoc2(withHoc3((Page)))`
 
-### `npm run eject`
+Compose allows us to write it like this:
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+`compose(withHoc1, withHoc2, withHoc3)(Page)`
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+After injecting the context providers, we can now access store values, and methods from our stores via props:
 
-Instead, it will copy all the configuration files and the transitive dependencies (Webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+`const {name, email, setName, setEmail} = this.props.usersStore`
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+## Stores
 
-## Learn More
+The term "store" isn't used in react context, but makes sense in our implementation and is a term borrowed from other libraries like Redux and MobX. In our case a store is a file that exports the react context provider and consumer. The store is where we define the values that a store holds, as well as some methods that can manipulate those values. At it's core, the store is a simple class based react component.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+initialState is used as a starting point for all of the values the store is responsible for. New values should always be defined here first. keeping initialState as a separate variable allows us to reset the store if we need to. This is helpful if a user logs out and we want to clear all the users values.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```
+const initialState = {
+  name: 'Joe Smith',
+  email: '',
+  nicknames: []
+}
 
-### Code Splitting
+export default class Provider extends Component {
+  state = initialState
+```
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/code-splitting
+The methods property is home to any methods we would like to make available when the store is injected into a component.
 
-### Analyzing the Bundle Size
+```
+  methods = {
+    reset: () => {
+      this.setState(initialState)
+    },
+    setJoshProfile: () => {
+      this.methods.setName('Josh')
+      this.methods.setEmail('jhardman0830@gmail.com')
+      this.methods.setNicknames(['Josh', 'J-Dizzle', 'Jman'])
+    },
+    setName: name => this.setStore('name', name),
+    setEmail: email => this.setStore('email', email),
+    setNicknames: nicknames => this.setStore('nicknames', nicknames)
+  }
+```
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size
+At the end of each store file you will find
+`Context = React.createContext()`
 
-### Making a Progressive Web App
+This is where we get the provider and consumer to export.
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app
+The store renders a Provider and passes our store values and methods. The provider is the default export.
 
-### Advanced Configuration
+```
+render() {
+    return (
+      <UsersContext.Provider
+        value={{ usersStore: { ...this.state, ...this.methods } }}
+      >
+        {this.props.children}
+      </UsersContext.Provider>
+    )
+  }
+```
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/advanced-configuration
+The consumer is exported as a named export
 
-### Deployment
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/deployment
-
-### `npm run build` fails to minify
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify
+`export const UsersConsumer = UsersContext.Consumer`
