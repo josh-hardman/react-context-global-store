@@ -1,4 +1,4 @@
-# React Context Replacement For MobX
+# React Context Global Store
 
 ## Providers
 
